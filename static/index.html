@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScamShield Honeypot 🛡️ - AI-Powered Scam Detection</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+    <meta name="description" content="AI-powered scam detection and prevention system for Indian users">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🛡️</span>
+                <div class="logo-text">
+                    <h1>ScamShield Honeypot</h1>
+                    <p class="tagline">AI-Powered Scam Detection for India</p>
+                </div>
+            </div>
+            <div class="header-badges">
+                <span class="badge">English</span>
+                <span class="badge">हिंदी</span>
+                <span class="badge">मराठी</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Hero Section -->
+            <section class="hero">
+                <h2>Protect Yourself from Digital Scams</h2>
+                <p>Forward suspicious messages (text, links, images) and get instant AI-powered analysis with risk assessment and safety guidance.</p>
+            </section>
+
+            <!-- Input Section -->
+            <section class="input-section">
+                <div class="input-container">
+                    <label for="message-input" class="input-label">
+                        <span class="label-icon">📝</span>
+                        Paste Suspicious Message
+                    </label>
+                    <textarea 
+                        id="message-input" 
+                        class="message-input" 
+                        placeholder="Paste suspicious message here... (English, Hindi, or Marathi)
+
+Examples:
+• OTP/UPI requests: 'Your OTP is 123456. Verify at...'
+• Prize scams: 'Congratulations! You've won...'
+• Digital arrest: 'This is police. You are under...'
+• Loan offers: 'Instant loan approved...'" 
+                        rows="6"
+                        maxlength="5000"
+                    ></textarea>
+                    <div class="input-footer">
+                        <span class="char-count"><span id="char-count">0</span>/5000</span>
+                    </div>
+                </div>
+
+                <button id="analyze-btn" class="analyze-btn">
+                    <span class="btn-icon">🔍</span>
+                    <span class="btn-text">Analyze Message</span>
+                </button>
+            </section>
+
+            <!-- Loading State -->
+            <div id="loading" class="loading-container hidden">
+                <div class="loading-spinner"></div>
+                <p class="loading-text">Analyzing message...</p>
+                <p class="loading-subtext">Using hybrid AI detection (Rules + LLM)</p>
+            </div>
+
+            <!-- Results Section -->
+            <section id="results" class="results-section hidden">
+                <!-- Risk Gauge -->
+                <div class="risk-gauge-container">
+                    <div class="risk-gauge">
+                        <svg viewBox="0 0 200 120" class="gauge-svg">
+                            <!-- Background arc -->
+                            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e0e0e0" stroke-width="20" stroke-linecap="round"/>
+                            <!-- Risk arc (colored based on score) -->
+                            <path id="gauge-arc" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#4caf50" stroke-width="20" stroke-linecap="round" stroke-dasharray="0 251"/>
+                            <!-- Score text -->
+                            <text id="gauge-score" x="100" y="85" text-anchor="middle" class="gauge-score">0%</text>
+                            <text x="100" y="105" text-anchor="middle" class="gauge-label">Risk Score</text>
+                        </svg>
+                    </div>
+                    <div id="risk-badge" class="risk-badge low-risk">
+                        <span class="risk-icon">✅</span>
+                        <span class="risk-text">Low Risk</span>
+                    </div>
+                </div>
+
+                <!-- Scam Type -->
+                <div class="result-card">
+                    <div class="result-header">
+                        <span class="result-icon">🏷️</span>
+                        <h3>Scam Type</h3>
+                    </div>
+                    <p id="scam-type" class="result-value">-</p>
+                </div>
+
+                <!-- Explanation -->
+                <div class="result-card">
+                    <div class="result-header">
+                        <span class="result-icon">📋</span>
+                        <h3>Analysis</h3>
+                    </div>
+                    <p id="explanation" class="result-value">-</p>
+                </div>
+
+<!-- High Risk Alert -->
+                <div id="high-risk-alert" class="high-risk-alert hidden">
+                    <div class="alert-header">
+                        <span class="alert-icon">🚨</span>
+                        <h3>⚠️ High Risk Detected!</h3>
+                    </div>
+                    <p>This message shows characteristics of a potential scam. Do NOT respond with personal information.</p>
+                    
+                    <!-- Suggested Safe Reply -->
+                    <div class="safe-reply-container">
+                        <label class="safe-reply-label">
+                            <span class="label-icon">🤥</span>
+                            Suggested Safe Reply (Honeypot Mode)
+                        </label>
+                        <div class="safe-reply-box">
+                            <p id="safe-reply-text">-</p>
+                            <button id="copy-reply-btn" class="copy-btn" title="Copy to clipboard">
+                                📋 Copy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Honeypot Chat Section -->
+                <div id="honeypot-chat" class="honeypot-chat hidden">
+                    <div class="honeypot-header">
+                        <span class="honeypot-icon">🎭</span>
+                        <h3>Honeypot Mode - Engage Safely</h3>
+                        <button id="start-honeypot-btn" class="start-honeypot-btn">Start Chat</button>
+                    </div>
+                    <div id="chat-messages" class="chat-messages"></div>
+                    <div class="chat-input-area">
+                        <input type="text" id="chat-input" placeholder="Paste scammer's next message here..." />
+                        <button id="send-chat" class="send-chat-btn">Send</button>
+                    </div>
+                    <div id="extracted-info" class="extracted-info">
+                        <h4>Extracted Information:</h4>
+                        <div id="extracted-data" class="extracted-data">
+                            <span class="extracted-item">UPI ID: <span id="upi-id">-</span></span>
+                            <span class="extracted-item">Phone: <span id="phone">-</span></span>
+                            <span class="extracted-item">Bank: <span id="bank">-</span></span>
+                            <span class="extracted-item">Amount: <span id="amount">-</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Safety Message -->
+                <div class="safety-message">
+                    <span class="safety-icon">⚠️</span>
+                    <p id="safety-text">Do NOT share OTP, passwords, or money. Block this number and report to 1930 (Cybercrime Helpline) or cybercrime.gov.in</p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <a href="tel:1930" class="action-btn report-btn">
+                        <span>📞</span> Call 1930
+                    </a>
+                    <a href="https://cybercrime.gov.in" target="_blank" class="action-btn cybercrime-btn">
+                        <span>🌐</span> Report Online
+                    </a>
+                    <button id="reset-btn" class="action-btn reset-btn">
+                        <span>🔄</span> Analyze Another
+                    </button>
+                </div>
+            </section>
+
+            <!-- Error Section -->
+            <div id="error" class="error-container hidden">
+                <span class="error-icon">❌</span>
+                <p id="error-message">An error occurred. Please try again.</p>
+            </div>
+        </main>
+
+        <!-- Features Section -->
+        <section class="features-section">
+            <h2>🔒 How ScamShield Protects You</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>AI-Powered Detection</h3>
+                    <p>Hybrid analysis using LLM + rule-based patterns for accurate scam identification</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌍</div>
+                    <h3>Multilingual Support</h3>
+                    <p>Full support for English, Hindi, and Marathi (code-mixed text OK)</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🤥</div>
+                    <h3>Honeypot Mode</h3>
+                    <p>Generate safe replies to engage scammers without revealing personal data</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Risk Assessment</h3>
+                    <p>Get risk score 0-100% with detailed explanation and scam type classification</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Supported Scam Types -->
+        <section class="scam-types-section">
+            <h2>🎯 Supported Scam Types</h2>
+            <div class="scam-types-grid">
+                <div class="scam-type-item">💳 UPI Phishing</div>
+                <div class="scam-type-item">💰 Fake Refund</div>
+                <div class="scam-type-item">📈 Investment Scam</div>
+                <div class="scam-type-item">🏦 Loan Scam</div>
+                <div class="scam-type-item">👮 Digital Arrest</div>
+                <div class="scam-type-item">🆔 Fake KYC</div>
+                <div class="scam-type-item">💻 Tech Support</div>
+                <div class="scam-type-item">🎁 Lottery/Prize</div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <p class="footer-title">ScamShield Honeypot 🛡️</p>
+                <p class="footer-text">AI-Powered Scam Detection & Prevention System for India</p>
+                <p class="footer-team">Created by <strong>Cracked Team</strong> - AI for Bharat Hackathon</p>
+                <p class="footer-team-lead">Team Leader: Lakshya Kumar Singh</p>
+                <div class="footer-links">
+                    <a href="https://cybercrime.gov.in" target="_blank">Report to Cybercrime</a>
+                    <span>•</span>
+                    <a href="tel:1930">Call 1930</a>
+                </div>
+                <p class="disclaimer">⚠️ This is a student prototype for educational/hackathon purposes.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

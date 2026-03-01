@@ -1,0 +1,23 @@
+# ScamShield Honeypot - Requirements
+# Install with: pip install -r requirements.txt
+
+# Core Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-dotenv>=1.0.0
+
+# LLM & AI
+ollama>=0.1.0
+langdetect>=1.0.9
+
+# Optional: Image Processing (for QR code/OCR support)
+# Uncomment if you want image analysis capability
+# easyocr>=1.7.0
+# pillow>=10.0.0
+
+# Utilities
+httpx>=0.25.0
+pydantic>=2.5.0
+
+# Development
+python-multipart>=0.0.6
