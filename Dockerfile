@@ -1,21 +1,21 @@
-# Use official lightweight Python 3.11 image
+# Official lightweight Python 3.11 base image (slim variant = faster/smaller)
 FROM python:3.11-slim
 
-# Set working directory
+# Set working directory inside the container
 WORKDIR /app
 
-# Copy requirements first (better caching)
+# Copy requirements.txt first for better Docker caching (faster rebuilds)
 COPY requirements.txt .
 
-# Install dependencies using python -m pip (safe way)
+# Upgrade pip and install dependencies (using full python -m path for reliability)
 RUN python -m pip install --no-cache-dir --upgrade pip && \
     python -m pip install --no-cache-dir -r requirements.txt
 
-# Copy your entire project
+# Copy the rest of your application code
 COPY . .
 
-# Expose port (App Runner maps external traffic here)
+# Expose the port (App Runner maps external traffic to this)
 EXPOSE 8000
 
-# Run FastAPI with uvicorn – must use $PORT env var
+# Start the FastAPI app – MUST use $PORT (App Runner injects this env var)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "$PORT"]
