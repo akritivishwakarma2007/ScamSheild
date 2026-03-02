@@ -7,6 +7,15 @@ to provide accurate scam detection.
 Author: Cracked Team - AI for Bharat Hackathon
 Team Leader: Lakshya Kumar Singh
 """
+"""
+ScamShield Honeypot - Hybrid Analyzer Module
+=============================================
+This module combines rule-based scoring with LLM analysis
+to provide accurate scam detection.
+
+Author: Cracked Team - AI for Bharat Hackathon
+Team Leader: Lakshya Kumar Singh
+"""
 
 import os
 import json
@@ -40,14 +49,16 @@ HIGH_RISK_THRESHOLD = 75
 # Timeout for LLM requests (seconds)
 LLM_TIMEOUT = 60
 
+# Bedrock client (global, initialized once)
+bedrock = boto3.client('bedrock-runtime', region_name='ap-south-1')  # Mumbai region for low latency
 
 # ============================================================================
 # LLM Analysis Functions
 # ============================================================================
 
-async def call_ollama(message: str) -> Dict:
+def call_bedrock(message: str) -> Dict:
     """
-    Call Ollama API for LLM analysis.
+    Call Amazon Bedrock (Claude 3.5 Sonnet) for LLM analysis.
     
     Args:
         message: The suspicious message to analyze
@@ -55,20 +66,62 @@ async def call_ollama(message: str) -> Dict:
     Returns:
         Dictionary with LLM analysis results
     """
-    import ollama
+    model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"  # Claude 3.5 Sonnet v2 (2024-10-22)
 
-    # Get configuration
+    prompt = build_analysis_prompt(message)
+
+    # Claude uses messages format
+    body = json.dumps({
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 500,
+        "temperature": 0.1,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ]
+    })
+
+    logger.info(f"🤖 Calling Bedrock with model: {model_id}")
+
+    try:
+        response = bedrock.invoke_model(
+            modelId=model_id,
+            contentType="application/json",
+            accept="application/json",
+            body=body
+        )
+
+        response_body = json.loads(response['body'].read())
+        llm_response = response_body['content'][0]['text'].strip()  # Claude returns text in content[0]
+
+        parsed = parse_llm_response(llm_response)
+
+        if parsed and validate_response(parsed):
+            logger.info(f"✅ Bedrock analysis successful: {parsed.get('risk_score', 0)}%")
+            return parsed
+        else:
+            logger.warning("⚠️ Bedrock response parsing failed, using default")
+            return get_default_response()
+
+    except Exception as e:
+        logger.error(f"❌ Bedrock error: {str(e)}")
+        return get_default_response()
+
+
+async def call_ollama(message: str) -> Dict:
+    """
+    Legacy Ollama call – kept as fallback or local dev option
+    """
+    import ollama
+    
     model = os.getenv("OLLAMA_MODEL", "gemma2:2b")
     base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     temperature = float(os.getenv("OLLAMA_TEMPERATURE", "0.1"))
     
-    # Build prompt
     prompt = build_analysis_prompt(message)
     
-    logger.info(f"🤖 Calling Ollama with model: {model}")
+    logger.info(f"🤖 Calling Ollama fallback with model: {model}")
     
     try:
-        # Call Ollama with async support
         response = await asyncio.to_thread(
             ollama.generate,
             model=model,
@@ -81,146 +134,78 @@ async def call_ollama(message: str) -> Dict:
             }
         )
         
-        # Extract response
         llm_response = response.get("response", "")
-        
-        # Parse JSON
         parsed = parse_llm_response(llm_response)
         
         if parsed and validate_response(parsed):
-            logger.info(f"✅ LLM analysis successful: {parsed.get('risk_score', 0)}%")
+            logger.info(f"✅ Ollama fallback successful: {parsed.get('risk_score', 0)}%")
             return parsed
         else:
-            logger.warning("⚠️ LLM response parsing failed, using default")
             return get_default_response()
             
     except Exception as e:
-        logger.error(f"❌ Ollama error: {str(e)}")
+        logger.error(f"❌ Ollama fallback error: {str(e)}")
         return get_default_response()
 
 
 def call_ollama_sync(message: str) -> Dict:
     """
-    Synchronous wrapper for Ollama API call.
-    
-    Args:
-        message: The suspicious message to analyze
-        
-    Returns:
-        Dictionary with LLM analysis results
+    Synchronous Ollama fallback
     """
-    import ollama
-    
-    # Get configuration
-    model = os.getenv("OLLAMA_MODEL", "gemma2:2b")
-    base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-    temperature = float(os.getenv("OLLAMA_TEMPERATURE", "0.1"))
-    
-    # Build prompt
-    prompt = build_analysis_prompt(message)
-    
-    logger.info(f"🤖 Calling Ollama with model: {model}")
-    
-    try:
-        response = ollama.generate(
-            model=model,
-            prompt=prompt,
-            format="json",
-            options={
-                "temperature": temperature,
-                "num_predict": 500,
-            }
-        )
-        
-        # Extract response
-        llm_response = response.get("response", "")
-        
-        # Parse JSON
-        parsed = parse_llm_response(llm_response)
-        
-        if parsed and validate_response(parsed):
-            logger.info(f"✅ LLM analysis successful: {parsed.get('risk_score', 0)}%")
-            return parsed
-        else:
-            logger.warning("⚠️ LLM response parsing failed, using default")
-            return get_default_response()
-            
-    except Exception as e:
-        logger.error(f"❌ Ollama error: {str(e)}")
-        return get_default_response()
+    # ... (your existing code remains, but you can simplify or remove if Bedrock is primary)
+    # For brevity – call the async version or keep as-is
+    return asyncio.run(call_ollama(message))  # simple sync wrapper
 
 
 # ============================================================================
-# Hybrid Analysis
+# Hybrid Analysis (updated to prefer Bedrock)
 # ============================================================================
 
 async def analyze_message(message: str) -> Dict:
     """
-    Perform hybrid analysis combining rule-based and LLM analysis.
-    
-    This function:
-    1. Runs rule-based analysis (40% weight)
-    2. Runs LLM analysis via Ollama (60% weight)
-    3. Combines scores for final risk assessment
-    4. Generates safe reply for high-risk messages
-    
-    Args:
-        message: The suspicious message to analyze
-        
-    Returns:
-        Dictionary with complete analysis results
+    Perform hybrid analysis – now prefers Bedrock, falls back to Ollama if needed
     """
     logger.info("🔍 Starting hybrid analysis...")
-    
-    # Step 1: Rule-based analysis
+
+    # Rule-based
     logger.info("📋 Running rule-based analysis...")
     rule_result = rule_based_score(message)
     rule_score = rule_result.score
     language = rule_result.detected_language
+    logger.info(f"Rule score: {rule_score}% ({', '.join(rule_result.matched_categories)})")
+
+    # LLM – try Bedrock first
+    logger.info("🤖 Running LLM analysis (Bedrock preferred)...")
+    llm_result = call_bedrock(message)
     
-    logger.info(f"   Rule score: {rule_score}% ({', '.join(rule_result.matched_categories)})")
-    
-    # Step 2: LLM analysis
-    logger.info("🤖 Running LLM analysis...")
-    llm_result = call_ollama_sync(message)
+    # If Bedrock fails badly (e.g. access denied), fallback to Ollama
+    if llm_result == get_default_response():
+        logger.warning("Bedrock returned default – falling back to Ollama")
+        llm_result = call_ollama_sync(message)
+
     llm_score = llm_result.get("risk_score", 50)
-    
-    logger.info(f"   LLM score: {llm_score}%")
-    
-    # Step 3: Combine scores
+    logger.info(f"LLM score: {llm_score}%")
+
+    # Combine scores
     final_score = int((rule_score * RULE_WEIGHT) + (llm_score * LLM_WEIGHT))
-    final_score = min(max(final_score, 0), 100)  # Clamp to 0-100
-    
-    logger.info(f"   Final score: {final_score}%")
-    
-    # Step 4: Determine scam type
-    # Prefer LLM classification but fallback to rule-based
+    final_score = min(max(final_score, 0), 100)
+
+    logger.info(f"Final score: {final_score}%")
+
+    # Scam type (prefer LLM)
     scam_type = llm_result.get("scam_type", "Other")
-    
-    # Step 5: Generate explanation
-    # Combine rule-based and LLM explanations
-    rule_explanation = get_explanation(rule_result.matched_categories, language)
-    llm_explanation = llm_result.get("explanation", "")
-    
-    if llm_explanation:
-        explanation = llm_explanation
-    else:
-        explanation = rule_explanation
-    
-    # Step 6: Determine if high risk
+
+    # Explanation (prefer LLM)
+    explanation = llm_result.get("explanation") or get_explanation(rule_result.matched_categories, language)
+
     is_high_risk = final_score >= HIGH_RISK_THRESHOLD
-    
-    # Step 7: Generate safe reply for high risk
+
     safe_reply = None
     if is_high_risk:
-        safe_reply = llm_result.get("safe_reply")
-        if not safe_reply:
-            safe_reply = generate_default_safe_reply(language, scam_type)
-    
-    # Step 8: Generate safety message
+        safe_reply = llm_result.get("safe_reply") or generate_default_safe_reply(language, scam_type)
+
     safety_message = generate_safety_message(language)
-    
-    # Step 9: Build final result
+
     result = {
         "risk_score": final_score,
         "scam_type": scam_type,
@@ -229,16 +214,15 @@ async def analyze_message(message: str) -> Dict:
         "suggested_safe_reply": safe_reply,
         "language": language,
         "safety_message": safety_message,
-        # Debug info (can be removed in production)
         "_debug": {
             "rule_score": rule_score,
             "llm_score": llm_score,
-            "rule_categories": rule_result.matched_categories
+            "rule_categories": rule_result.matched_categories,
+            "llm_source": "bedrock" if "Bedrock" in llm_result.get("_debug", {}).get("source", "") else "ollama"
         }
     }
-    
+
     logger.info(f"✅ Analysis complete: {final_score}% - {scam_type}")
-    
     return result
 
 
